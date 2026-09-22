@@ -15,7 +15,7 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - run: echo "y" | flet build ipa
+      - run: echo "y" | flet build ipa main.py
       - uses: actions/upload-artifact@v4
         with:
           name: MorningApp-IPA
