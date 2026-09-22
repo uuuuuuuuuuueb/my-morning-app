@@ -19,14 +19,32 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Отладочный шаг: покажет реальную структуру репозитория в логе
       - name: Show repo structure
         run: ls -la
 
-      - name: Build IPA
+      - name: Build unsigned archive
         run: echo "y" | flet build ipa . --module-name main
+
+      - name: Show build output structure
+        run: find build -maxdepth 4
+
+      - name: Package unsigned IPA from archive
+        run: |
+          set -e
+          ARCHIVE_APP=$(find build -name "*.app" -path "*Products/Applications*" | head -n 1)
+          if [ -z "$ARCHIVE_APP" ]; then
+            echo "Не найден .app внутри архива — смотри вывод предыдущего шага 'Show build output structure'"
+            exit 1
+          fi
+          echo "Found app: $ARCHIVE_APP"
+          mkdir -p ipa_out/Payload
+          cp -R "$ARCHIVE_APP" ipa_out/Payload/
+          cd ipa_out
+          zip -qr ../MorningApp-unsigned.ipa Payload
+          cd ..
+          ls -lh MorningApp-unsigned.ipa
 
       - uses: actions/upload-artifact@v4
         with:
           name: MorningApp-IPA
-          path: build/**/*.ipa
+          path: MorningApp-unsigned.ipa
