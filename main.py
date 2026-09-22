@@ -2,6 +2,7 @@ import flet as ft
 from datetime import datetime, timedelta
 import json
 import os
+import threading
 
 DATA_FILE = "streak_data.json"
 
@@ -51,8 +52,44 @@ def main(page: ft.Page):
     streak_label = ft.Text("дней подряд", size=14, color=GREY, weight=ft.FontWeight.W_500)
     time_text = ft.Text("Ты еще не проснулся", size=13, color=GREY)
 
-    countdown_value = ft.Text("--:--", size=36, weight=ft.FontWeight.W_800, color=WHITE)
-    countdown_caption = ft.Text("выбери направление", size=13, color=GREY)
+    # --- Баннер-уведомление (имитация push-уведомления) ---
+    notif_title = ft.Text("МОЕ УТРО", size=11, weight=ft.FontWeight.W_800, color="#555555")
+    notif_time = ft.Text("сейчас", size=11, color="#8A8A8A")
+    notif_body = ft.Text("Выбери направление, чтобы увидеть время выхода", size=14, weight=ft.FontWeight.W_600, color=BLACK)
+
+    notif_banner = ft.Container(
+        content=ft.Row(
+            [
+                ft.Container(
+                    content=ft.Icon(ft.icons.NOTIFICATIONS_ROUNDED, color=WHITE, size=18),
+                    bgcolor=BLACK,
+                    width=32,
+                    height=32,
+                    border_radius=8,
+                    alignment=ft.alignment.center,
+                ),
+                ft.Column(
+                    [
+                        ft.Row(
+                            [notif_title, notif_time],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        notif_body,
+                    ],
+                    spacing=2,
+                    expand=True,
+                ),
+            ],
+            spacing=10,
+            vertical_alignment=ft.CrossAxisAlignment.START,
+        ),
+        bgcolor="#EDEDED",
+        border_radius=18,
+        padding=14,
+        animate=ft.animation.Animation(250, ft.AnimationCurve.EASE_OUT),
+    )
+
+    countdown_timer = {"handle": None}
 
     def wake_up_click(e):
         now = datetime.now()
@@ -98,7 +135,9 @@ def main(page: ft.Page):
         "Работа": (10, 0),
     }
 
-    def calculate_departure(e):
+    def refresh_notification():
+        if not dest_dropdown.value:
+            return
         now = datetime.now()
         h, m = destinations[dest_dropdown.value]
         target_time = now.replace(hour=h, minute=m, second=0, microsecond=0)
@@ -110,10 +149,24 @@ def main(page: ft.Page):
         hours, remainder = divmod(diff.seconds, 3600)
         minutes, _ = divmod(remainder, 60)
 
-        countdown_value.value = f"{hours}ч {minutes}м"
-        countdown_caption.value = f"до выхода · {dest_dropdown.value}"
-        countdown_caption.color = WHITE
-        page.update()
+        notif_body.value = f"До выхода ({dest_dropdown.value}): {hours} ч {minutes} мин"
+        notif_time.value = now.strftime("%H:%M")
+        try:
+            page.update()
+        except Exception:
+            pass
+
+    def schedule_next_refresh():
+        refresh_notification()
+        # обновляем баннер каждую минуту, пока приложение открыто
+        countdown_timer["handle"] = threading.Timer(60, schedule_next_refresh)
+        countdown_timer["handle"].daemon = True
+        countdown_timer["handle"].start()
+
+    def calculate_departure(e):
+        if countdown_timer["handle"]:
+            countdown_timer["handle"].cancel()
+        schedule_next_refresh()
 
     dest_dropdown = ft.Dropdown(
         options=[ft.dropdown.Option(k) for k in destinations],
@@ -165,8 +218,7 @@ def main(page: ft.Page):
                        spacing=6),
                 dest_dropdown,
                 ft.Container(height=8),
-                countdown_value,
-                countdown_caption,
+                notif_banner,
             ],
             spacing=10,
         )
