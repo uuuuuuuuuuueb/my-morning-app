@@ -15,9 +15,13 @@ jobs:
         with:
           channel: 'stable'
 
-      - run: |
+      - name: Install app dependencies
+        run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Install matching flet-cli build tool
+        run: pip install flet-cli==0.28.3
 
       - name: Show repo structure
         run: ls -la
